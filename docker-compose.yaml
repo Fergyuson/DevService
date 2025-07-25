@@ -1,0 +1,26 @@
+services:
+  # MongoDB
+  mongodb:
+    image: mongo:7.0
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: test_database
+    volumes:
+      - mongodb_data:/data/db
+
+  # Приложение (Backend + Frontend статика)
+  app:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - MONGO_URL=mongodb://mongodb:27017
+      - DB_NAME=test_database
+    depends_on:
+      - mongodb
+
+volumes:
+  mongodb_data:
