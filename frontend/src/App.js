@@ -8,6 +8,7 @@ import CatalogPage from './pages/CatalogPage';
 import CartPage from './pages/CartPage';
 import ProductDetailPage from './pages/ProductDetailPage';
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
+import OfferPage from "./pages/OfferPage";
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
             <Route path="/product/:id" element={<ProductDetailPage />} />
             <Route path="/services" element={<CatalogPage />} />
             <Route path="/policy" element={<PrivacyPolicyPage />} />
+            <Route path="/offer" element={<OfferPage />} />
           </Routes>
         </BrowserRouter>
       </div>

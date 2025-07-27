@@ -36,7 +36,7 @@ const HomePage = () => {
                   </button>
                 </div>
 
-                {/* Подпись с ссылкой на политику */}
+
                 <div className="mt-6">
                   <Link
                       to="/policy"
@@ -94,6 +94,17 @@ const HomePage = () => {
                 <h3 className="text-xl font-semibold mb-2">Поддержка 24/7</h3>
                 <p className="text-gray-600">Всегда готовы помочь и ответить на вопросы</p>
               </div>
+
+              <div className="mt-12 text-center md:col-start-2">
+                <Link
+                    to="/offer"
+                    className="text-base text-gray-700 underline hover:text-gray-800"
+                    aria-label="Договор оферты"
+                >
+                  Договор оферты
+                </Link>
+              </div>
+
             </div>
           </div>
         </section>
