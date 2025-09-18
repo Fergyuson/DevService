@@ -1,19 +1,21 @@
+import json
 import logging
 import os
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import List
+from json import JSONDecodeError
+from typing import Any, Dict, List
 
 from dotenv import load_dotenv
 from dotenv import load_dotenv
-from fastapi import FastAPI, APIRouter, HTTPException
-from fastapi import FastAPI, APIRouter, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, FastAPI, HTTPException, Request
+from fastapi import APIRouter, FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from motor.motor_asyncio import AsyncIOMotorClient
 from motor.motor_asyncio import AsyncIOMotorClient
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from starlette.responses import FileResponse
 
 ROOT_DIR = Path(__file__).parent
@@ -23,6 +25,12 @@ load_dotenv(ROOT_DIR / '.env')
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
+
+WEBHOOK_REDIRECT_URL = os.environ.get("WEBHOOK_REDIRECT_URL")
+WEBHOOK_VERIFICATION_STATE_ID = "webhook_verification"
+
+webhook_state_collection = db["webhook_state"]
+webhook_events_collection = db["webhook_events"]
 
 # Create the main app without a prefix
 app = FastAPI()
@@ -57,6 +65,20 @@ class Cart(BaseModel):
     items: List[CartItem]
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class WebhookPayload(BaseModel):
+    """Гибкая модель для входящих webhook-событий."""
+
+    model_config = ConfigDict(extra="allow")
+
+    id: str | None = None
+    event_type: str | None = Field(default=None, alias="eventType")
+
+
+class WebhookProcessResult(BaseModel):
+    status: str = "ok"
+    saved_event_id: str
 
 
 # QR codes data for different banks and amounts
@@ -835,6 +857,23 @@ async def initialize_products():
     except Exception as e:
         print(f"Error initializing products: {e}")
 
+
+async def is_webhook_verified() -> bool:
+    """Проверяет, проходила ли точка вебхука первоначальную проверку."""
+
+    record = await webhook_state_collection.find_one({"_id": WEBHOOK_VERIFICATION_STATE_ID})
+    return bool(record and record.get("verified"))
+
+
+async def mark_webhook_verified() -> None:
+    """Помечает эндпоинт как успешно проверенный и сохраняет время проверки."""
+
+    await webhook_state_collection.update_one(
+        {"_id": WEBHOOK_VERIFICATION_STATE_ID},
+        {"$set": {"verified": True, "verified_at": datetime.utcnow()}},
+        upsert=True,
+    )
+
 @api_router.get("/products", response_model=List[Product])
 async def get_products():
     """Get all products"""
@@ -910,6 +949,60 @@ async def get_qr_code_endpoint(bank: str, amount: int):
     except Exception as e:
         print(f"Error getting QR code: {e}")
         raise HTTPException(status_code=500, detail="Error getting QR code")
+
+
+@api_router.post("/webhook/transactions", response_model=WebhookProcessResult)
+async def receive_transaction_webhook(request: Request):
+    """Обрабатывает входящие уведомления от платёжного провайдера."""
+
+    if not WEBHOOK_REDIRECT_URL:
+        raise HTTPException(status_code=500, detail="Webhook redirect URL is not configured")
+
+    already_verified = await is_webhook_verified()
+
+    raw_body = await request.body()
+    payload: Dict[str, Any] = {}
+    raw_payload = ""
+
+    if raw_body:
+        try:
+            raw_payload = raw_body.decode("utf-8")
+            payload = json.loads(raw_payload)
+        except (UnicodeDecodeError, JSONDecodeError):
+            raise HTTPException(status_code=400, detail="Invalid JSON payload")
+
+    if not already_verified:
+        await mark_webhook_verified()
+        logger.info("Webhook verification request received. Redirecting to %s", WEBHOOK_REDIRECT_URL)
+        return RedirectResponse(url=WEBHOOK_REDIRECT_URL, status_code=307)
+
+    if not payload:
+        raise HTTPException(status_code=400, detail="Webhook payload is empty")
+
+    event_data = WebhookPayload.model_validate(payload)
+    saved_event_id = event_data.id or str(uuid.uuid4())
+
+    record = {
+        "_id": saved_event_id,
+        "event_type": event_data.event_type,
+        "payload": payload,
+        "raw_payload": raw_payload,
+        "headers": {key: value for key, value in request.headers.items()},
+        "received_at": datetime.utcnow(),
+    }
+
+    try:
+        await webhook_events_collection.update_one(
+            {"_id": saved_event_id},
+            {"$set": record},
+            upsert=True,
+        )
+    except Exception as error:
+        logger.exception("Failed to persist webhook payload: %s", error)
+        raise HTTPException(status_code=500, detail="Failed to persist webhook data")
+
+    logger.info("Webhook event %s stored successfully", saved_event_id)
+    return WebhookProcessResult(saved_event_id=saved_event_id)
 
 @api_router.get("/banks")
 async def get_banks():
