@@ -11,7 +11,9 @@
 2. **Развернуть проект**
    - Установить системные пакеты: `sudo apt update && sudo apt install -y git docker docker-compose-plugin`.
    - Клонировать репозиторий: `git clone <repo_url> && cd DevService`.
+
    - Скопировать `.env.example` в `.env` и при необходимости заменить `APP_HOST_PORT`. Если на сервере уже занят порт 80, укажите свободный порт (например, `APP_HOST_PORT=8080`).
+
 
 3. **Сконфигурировать окружение**
    - Создать файл `backend/.env` на основе `backend/.env.example` и прописать:
@@ -25,7 +27,11 @@
      после перенаправления отвечает `200 OK` и JSON `{"error":"webhook data is invalid"}`.
 
 4. **Запустить сервисы**
+
    - `docker compose up -d` — поднимет FastAPI-приложение и MongoDB. Docker Compose подставит порт из `.env` (по умолчанию `8000`).
+
+   - `docker compose up -d` — поднимет FastAPI-приложение и MongoDB.
+
    - Проверить, что контейнеры запущены: `docker compose ps`.
 
 5. **Настроить обратное проксирование**
@@ -56,11 +62,13 @@
        -d '{"id":"test","eventType":"transaction.paid"}'
      ```
      Ответ должен быть `200 OK` с `saved_event_id`, а событие появится в MongoDB (`webhook_events`).
+
    - Чтобы быстро проверить статус, выполните:
      ```bash
      curl -s https://www.e-devservice.ru/api/webhook/transactions/status | jq
      ```
      Ответ покажет, прошла ли проверка (`verified`) и время последнего подтверждения (`verified_at`).
+
 
 ## 2. Что делает backend
 
@@ -75,7 +83,9 @@
 ### Где хранится состояние
 
 - Коллекция `webhook_state` содержит запись `_id = "webhook_verification"`, в которой фиксируется, что проверка пройдена, и время `verified_at`.
+
 - Эндпоинт `GET /api/webhook/transactions/status` возвращает JSON с признаками `verified` и `verified_at`, чтобы можно было проверить состояние без захода в базу.
+
 
 ## 3. Проверка работоспособности
 
