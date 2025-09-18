@@ -6,12 +6,19 @@ from datetime import datetime
 from json import JSONDecodeError
 from pathlib import Path
 from typing import Any, Dict, List
+from dotenv import load_dotenv
+from json import JSONDecodeError
+from typing import Any, Dict, List
 
 from dotenv import load_dotenv
+from dotenv import load_dotenv
+from fastapi import APIRouter, FastAPI, HTTPException, Request
+
 from fastapi import APIRouter, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from motor.motor_asyncio import AsyncIOMotorClient
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -28,6 +35,10 @@ def _require_env(name: str) -> str:
         raise RuntimeError(f"Environment variable {name} is not set")
     return value
 
+from motor.motor_asyncio import AsyncIOMotorClient
+from pydantic import BaseModel, ConfigDict, Field
+from starlette.responses import FileResponse
+
 
 # MongoDB connection
 mongo_url = _require_env("MONGO_URL")
@@ -35,6 +46,12 @@ client = AsyncIOMotorClient(mongo_url)
 db = client[_require_env("DB_NAME")]
 
 WEBHOOK_REDIRECT_URL = os.getenv("WEBHOOK_REDIRECT_URL")
+WEBHOOK_VERIFICATION_STATE_ID = "webhook_verification"
+
+webhook_state_collection = db["webhook_state"]
+webhook_events_collection = db["webhook_events"]
+
+WEBHOOK_REDIRECT_URL = os.environ.get("WEBHOOK_REDIRECT_URL")
 WEBHOOK_VERIFICATION_STATE_ID = "webhook_verification"
 
 webhook_state_collection = db["webhook_state"]
