@@ -9,6 +9,7 @@ services:
     environment:
       MONGO_URL: "mongodb://mongodb:27017"
       DB_NAME: "test_database"
+      WEBHOOK_REDIRECT_URL: "https://cb.boogienwoogie.com/webhook/tbank"
     depends_on:
       - mongodb
     restart: unless-stopped
