@@ -6,6 +6,10 @@ from datetime import datetime
 from json import JSONDecodeError
 from pathlib import Path
 from typing import Any, Dict, List
+
+
+from dotenv import load_dotenv
+
 from dotenv import load_dotenv
 from json import JSONDecodeError
 from typing import Any, Dict, List
@@ -14,10 +18,12 @@ from dotenv import load_dotenv
 from dotenv import load_dotenv
 from fastapi import APIRouter, FastAPI, HTTPException, Request
 
+
 from fastapi import APIRouter, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from motor.motor_asyncio import AsyncIOMotorClient
+
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -40,6 +46,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from starlette.responses import FileResponse
 
 
+
 # MongoDB connection
 mongo_url = _require_env("MONGO_URL")
 client = AsyncIOMotorClient(mongo_url)
@@ -51,11 +58,13 @@ WEBHOOK_VERIFICATION_STATE_ID = "webhook_verification"
 webhook_state_collection = db["webhook_state"]
 webhook_events_collection = db["webhook_events"]
 
+
 WEBHOOK_REDIRECT_URL = os.environ.get("WEBHOOK_REDIRECT_URL")
 WEBHOOK_VERIFICATION_STATE_ID = "webhook_verification"
 
 webhook_state_collection = db["webhook_state"]
 webhook_events_collection = db["webhook_events"]
+
 
 # Create the main app without a prefix
 app = FastAPI()
@@ -104,6 +113,13 @@ class WebhookPayload(BaseModel):
 class WebhookProcessResult(BaseModel):
     status: str = "ok"
     saved_event_id: str
+
+
+class WebhookVerificationStatus(BaseModel):
+    """Состояние прохождения проверки вебхука."""
+
+    verified: bool
+    verified_at: datetime | None = None
 
 
 # QR codes data for different banks and amounts
@@ -1028,6 +1044,18 @@ async def receive_transaction_webhook(request: Request):
 
     logger.info("Webhook event %s stored successfully", saved_event_id)
     return WebhookProcessResult(saved_event_id=saved_event_id)
+
+
+
+@api_router.get("/webhook/transactions/status", response_model=WebhookVerificationStatus)
+async def get_webhook_verification_status() -> WebhookVerificationStatus:
+    """Возвращает текущее состояние прохождения проверки вебхука."""
+
+    record = await webhook_state_collection.find_one({"_id": WEBHOOK_VERIFICATION_STATE_ID})
+    verified = bool(record and record.get("verified"))
+    verified_at = record.get("verified_at") if record else None
+    return WebhookVerificationStatus(verified=verified, verified_at=verified_at)
+
 
 @api_router.get("/banks")
 async def get_banks():
