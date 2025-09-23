@@ -1009,6 +1009,20 @@ async def receive_transaction_webhook(request: Request):
         try:
             raw_payload = raw_body.decode("utf-8")
             payload = json.loads(raw_payload)
+
+            payload_is_empty_json = (
+                    (isinstance(payload, dict) and not payload)
+                    or (isinstance(payload, list) and not payload)
+                    or raw_payload.strip() == "{}"
+            )
+
+            if payload_is_empty_json:
+                logger.info(
+                    "Webhook verification ping with empty JSON payload. Redirecting to %s",
+                    WEBHOOK_REDIRECT_URL,
+                )
+                await mark_webhook_verified()
+                return RedirectResponse(url=WEBHOOK_REDIRECT_URL, status_code=307)
         except (UnicodeDecodeError, JSONDecodeError):
             raise HTTPException(status_code=400, detail="Invalid JSON payload")
 
