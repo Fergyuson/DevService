@@ -72,6 +72,20 @@ def webhook_server(monkeypatch):
 
 
 @pytest.mark.anyio("asyncio")
+
+async def test_empty_body_triggers_verification_redirect(webhook_server):
+    request = _build_request(b"")
+
+    response = await webhook_server.receive_transaction_webhook(request)
+
+    assert isinstance(response, RedirectResponse)
+    assert response.status_code == 307
+    assert response.headers["location"] == webhook_server.WEBHOOK_REDIRECT_URL
+    assert webhook_server.mark_webhook_verified.await_count == 1
+
+
+@pytest.mark.anyio("asyncio")
+
 async def test_empty_json_body_triggers_verification_redirect(webhook_server):
     request = _build_request(b"{}", headers={"Content-Type": "application/json"})
 
@@ -88,3 +102,4 @@ def anyio_backend():
     """Ограничивает запуск anyio только циклом asyncio."""
 
     return "asyncio"
+
