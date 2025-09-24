@@ -1012,6 +1012,7 @@ async def receive_transaction_webhook(request: Request):
         await mark_webhook_verified()
         return RedirectResponse(url=WEBHOOK_REDIRECT_URL, status_code=307)
 
+
     if not already_verified:
         await mark_webhook_verified()
         logger.info("Webhook verification request received. Redirecting to %s", WEBHOOK_REDIRECT_URL)
